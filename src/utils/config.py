@@ -74,6 +74,36 @@ class ConfigLoader:
             bool: True for headless, False for headed.
         """
         return os.getenv('HEADLESS', 'false').lower() in ['true', '1']
+
+    @staticmethod
+    def playwright_device() -> str:
+        """
+        Optional Playwright device profile name.
+
+        Returns:
+            str: Device descriptor name (for example: iPhone 13), empty if not set.
+        """
+        return os.getenv('PLAYWRIGHT_DEVICE', '').strip()
+
+    @staticmethod
+    def viewport_width() -> int:
+        """
+        Viewport width for desktop/custom context.
+
+        Returns:
+            int: Viewport width in pixels.
+        """
+        return int(os.getenv('VIEWPORT_WIDTH', '1366'))
+
+    @staticmethod
+    def viewport_height() -> int:
+        """
+        Viewport height for desktop/custom context.
+
+        Returns:
+            int: Viewport height in pixels.
+        """
+        return int(os.getenv('VIEWPORT_HEIGHT', '768'))
     
     # ===== APPIUM CONFIG =====
     @staticmethod

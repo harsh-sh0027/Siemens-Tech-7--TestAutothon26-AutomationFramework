@@ -53,8 +53,19 @@ class PlaywrightDriver(IDriverProvider):
         self._browser = browser
         self._context = context
         self._page = page
+        self._trace_path = None
+        self._trace_started = False
         self.is_mobile = False  # Web platform
         logger.info(f"PlaywrightDriver initialized (page: {page.url})")
+
+    async def start_trace(self, trace_path: str):
+        """Start Playwright built-in tracing for this test session."""
+        if self._trace_started:
+            return
+        await self._context.tracing.start(screenshots=True, snapshots=True, sources=True)
+        self._trace_path = trace_path
+        self._trace_started = True
+        logger.info(f"Playwright trace started: {trace_path}")
     
     def get_page(self):
         """Return Playwright page."""
@@ -68,6 +79,9 @@ class PlaywrightDriver(IDriverProvider):
         """Close Playwright browser and context."""
         logger.info("Closing Playwright driver")
         try:
+            if self._trace_started and self._trace_path:
+                await self._context.tracing.stop(path=self._trace_path)
+                logger.info(f"Playwright trace saved: {self._trace_path}")
             await self._context.close()
             await self._browser.close()
             logger.info("Playwright driver closed")
@@ -134,7 +148,15 @@ class DriverFactory:
         Raises:
             DriverInitException: If browser launch fails.
         """
-        logger.info(f"Creating Playwright driver (browser: {ConfigLoader.browser()}, headless: {ConfigLoader.headless()})")
+        logger.info(
+            "Creating Playwright driver (browser: %s, channel: %s, headless: %s, device: %s, viewport: %sx%s)",
+            ConfigLoader.browser(),
+            ConfigLoader.browser_channel() or "default",
+            ConfigLoader.headless(),
+            ConfigLoader.playwright_device() or "none",
+            ConfigLoader.viewport_width(),
+            ConfigLoader.viewport_height(),
+        )
         
         try:
             from playwright.async_api import async_playwright
@@ -143,15 +165,41 @@ class DriverFactory:
             
             # Launch browser based on config
             browser_type = ConfigLoader.browser().lower()
+            launch_kwargs = {"headless": ConfigLoader.headless()}
+            browser_channel = ConfigLoader.browser_channel()
+            if browser_type == 'chrome' and not browser_channel:
+                browser_channel = 'chrome'
+            elif browser_type == 'edge' and not browser_channel:
+                browser_channel = 'msedge'
+
+            if browser_type in ('chromium', 'chrome', 'edge') and browser_channel:
+                launch_kwargs["channel"] = browser_channel
+
             if browser_type == 'firefox':
-                browser = await async_pw.firefox.launch(headless=ConfigLoader.headless())
+                browser = await async_pw.firefox.launch(**launch_kwargs)
             elif browser_type == 'webkit':
-                browser = await async_pw.webkit.launch(headless=ConfigLoader.headless())
-            else:  # chromium (default)
-                browser = await async_pw.chromium.launch(headless=ConfigLoader.headless())
+                browser = await async_pw.webkit.launch(**launch_kwargs)
+            else:  # chromium family (default)
+                browser = await async_pw.chromium.launch(**launch_kwargs)
             
-            # Create context and page
-            context = await browser.new_context()
+            # Create context and page with either device profile or custom viewport.
+            device_name = ConfigLoader.playwright_device()
+            if device_name:
+                device_descriptor = async_pw.devices.get(device_name)
+                if not device_descriptor:
+                    raise DriverInitException(
+                        f"Unknown Playwright device profile: {device_name}. "
+                        f"Use a valid name from Playwright devices list."
+                    )
+                context = await browser.new_context(**device_descriptor)
+            else:
+                context = await browser.new_context(
+                    viewport={
+                        "width": ConfigLoader.viewport_width(),
+                        "height": ConfigLoader.viewport_height(),
+                    }
+                )
+
             page = await context.new_page()
             
             # Set navigation timeout

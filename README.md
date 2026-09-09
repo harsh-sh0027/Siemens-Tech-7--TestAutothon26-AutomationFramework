@@ -59,6 +59,105 @@ pytest src/test/python/tests/ -v -n 4  # 4 workers
 pytest src/test/python/tests/test_login.py::TestLogin::test_login_valid_credentials -v
 ```
 
+#### Browser and Device-Size from CLI
+```bash
+# Browser selection
+pytest src/test/python/tests/ -v --browser chromium
+pytest src/test/python/tests/ -v --browser chrome
+pytest src/test/python/tests/ -v --browser firefox
+pytest src/test/python/tests/ -v --browser webkit
+pytest src/test/python/tests/ -v --browser edge --browser-channel msedge
+
+# Desktop viewport size
+pytest src/test/python/tests/ -v --browser chromium --viewport 1920x1080
+
+# Playwright device emulation
+pytest src/test/python/tests/ -v --browser chromium --device "iPhone 13"
+pytest src/test/python/tests/ -v --browser chromium --device "Pixel 5"
+
+# Force headed/headless
+pytest src/test/python/tests/ -v --headed
+pytest src/test/python/tests/ -v --headless
+```
+
+#### Shortcut Script (npm-run style)
+Use one command wrapper file for common runs:
+
+```powershell
+# Web desktop on Firefox with custom viewport
+./run-tests.ps1 -Mode web -Browser firefox -TargetDevice desktop -Viewport 1600x900 -Headless
+
+# Web mobile emulation (Playwright built-in device)
+./run-tests.ps1 -Mode web -Browser chromium -TargetDevice iphone13 -Headless
+
+# Mobile Appium run
+./run-tests.ps1 -Mode mobile -TestPath src/test/python/tests/test_login.py -v
+```
+
+You can pass any extra pytest args at the end, for example:
+
+```powershell
+./run-tests.ps1 -Mode web -Browser chromium -TargetDevice desktop -Viewport 1366x768 -Headed -PytestArgs "-k","login","-n","2"
+```
+
+#### Keyword Runner (Very Short Commands)
+Use predefined keywords so you do not type long commands:
+
+```powershell
+# List available keywords
+./run-keyword.ps1 -List
+
+# Common runs
+./run-keyword.ps1 chrome
+./run-keyword.ps1 firefox
+./run-keyword.ps1 webkit
+./run-keyword.ps1 edge
+./run-keyword.ps1 iphone13
+./run-keyword.ps1 pixel5
+./run-keyword.ps1 ipad
+./run-keyword.ps1 mobile
+
+# Add extra pytest args
+./run-keyword.ps1 chrome -PytestArgs "--collect-only"
+
+# Run a specific file with a keyword profile
+./run-keyword.ps1 firefox -TestPath src/test/python/tests/test_login.py
+
+# Override headed/headless for any keyword
+./run-keyword.ps1 iphone13 -Headed
+./run-keyword.ps1 chrome -Headless
+```
+
+### Reports Per Run
+
+Every pytest run now creates a unique timestamped folder under `reports/runs/<YYYYMMDD-HHMMSS>/` with:
+
+- `index.html` (run dashboard with links to all artifacts)
+- `report.html` (pytest-html, self-contained)
+- `junit.xml` (JUnit format for CI)
+- `report.json` (machine-readable summary)
+- `allure-results/` (raw Allure artifacts)
+- `playwright-traces/` (Playwright built-in trace ZIP files)
+- `screenshots/` (failure screenshots captured by hooks)
+
+Example run command:
+
+```bash
+pytest src/test/python/tests/test_login.py::TestLogin::test_login_invalid_otp -v
+```
+
+Optional: generate a browsable Allure report (requires Allure CLI):
+
+```bash
+allure serve reports/runs/<RUN_ID>/allure-results
+```
+
+Playwright built-in HTML investigation path:
+
+```bash
+playwright show-trace reports/runs/<RUN_ID>/playwright-traces/<test-name>.zip
+```
+
 ---
 
 ## Directory Structure
