@@ -13,6 +13,7 @@ import asyncio
 import time
 import os
 import re
+from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
 from html import escape
@@ -139,6 +140,14 @@ def event_loop():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     yield loop
+    pending = [task for task in asyncio.all_tasks(loop) if not task.done()]
+    for task in pending:
+        task.cancel()
+    if pending:
+        with suppress(Exception):
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    with suppress(Exception):
+        loop.run_until_complete(loop.shutdown_asyncgens())
     loop.close()
 
 
@@ -224,7 +233,6 @@ def driver(is_mobile, event_loop, request):
             # Capture Playwright native trace for each web test.
             if hasattr(driver_instance, "start_trace"):
                 event_loop.run_until_complete(driver_instance.start_trace(trace_path))
-        driver_instance = event_loop.run_until_complete(DriverFactory.create_driver(is_mobile))
         
         logger.info("Driver fixture initialized successfully")
         yield driver_instance
@@ -237,15 +245,17 @@ def driver(is_mobile, event_loop, request):
         # Teardown: Close driver
         logger.info("Tearing down driver fixture")
         try:
-            if (not is_mobile) and trace_path:
-                logger.info(f"Playwright trace target: {trace_path}")
-
-            if is_mobile:
-                driver_instance.close()
+            if driver_instance is None:
+                logger.info("Driver was not initialized; skipping close")
             else:
-                if driver_instance is not None:
+                if (not is_mobile) and trace_path:
+                    logger.info(f"Playwright trace target: {trace_path}")
+
+                if is_mobile:
+                    driver_instance.close()
+                else:
                     event_loop.run_until_complete(driver_instance.close())
-                    logger.info("Driver closed successfully")
+                logger.info("Driver closed successfully")
         except Exception as e:
             logger.error(f"Error closing driver: {e}")
 

@@ -4,51 +4,9 @@ Common behavior for all Web page objects.
 """
 
 import os
-import asyncio
 from datetime import datetime
 
-from src.utils.logger import StructuredLogger
-from src.utils.waits import WaitUtilities
-from src.utils.config import ConfigLoader
-from src.pages.interfaces.base_page import IBasePage
-
-logger = StructuredLogger.get_logger(__name__)
-
-
-def _run_async(coro):
-    """Helper to run async coroutine from sync context."""
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        # No running loop, create one
-        return asyncio.run(coro)
-    else:
-        # Running loop exists - create a task and wait
-        import concurrent.futures
-        import threading
-        
-        future = concurrent.futures.Future()
-        
-        def set_result():
-            try:
-                result = asyncio.run(coro)
-                future.set_result(result)
-            except Exception as e:
-                future.set_exception(e)
-        
-        threading.Thread(target=set_result, daemon=True).start()
-        return future.result(timeout=30)
-
-
-"""Base page for all Web pages (Playwright-backed).
-
-Common behavior for all Web page objects.
-"""
-
-import os
-import asyncio
-from datetime import datetime
-
+from src.exceptions import ElementNotFoundException
 from src.utils.logger import StructuredLogger
 from src.utils.waits import WaitUtilities
 from src.utils.config import ConfigLoader
@@ -95,9 +53,18 @@ class BasePage(IBasePage):
         """
         logger.info(f"Navigating to: {url}")
         try:
-            await self.page.goto(url, wait_until='networkidle')
-            # Wait for body to ensure page is loaded
+            # Some SPAs keep network busy; start with lighter readiness signals.
+            try:
+                await self.page.goto(url, wait_until='domcontentloaded')
+            except Exception:
+                await self.page.goto(url, wait_until='load')
+
+            # Wait for body and attempt network idle as a best-effort only.
             await WaitUtilities.wait_for_visible(self.page, "body")
+            try:
+                await self.page.wait_for_load_state("networkidle", timeout=5000)
+            except Exception:
+                logger.debug("networkidle not reached; proceeding with visible DOM")
             logger.info(f"Page loaded: {url}")
         except Exception as e:
             logger.error(f"Navigation failed: {url} - {e}")
@@ -116,6 +83,25 @@ class BasePage(IBasePage):
         """
         logger.debug(f"Finding element: {selector}")
         return await WaitUtilities.wait_for_visible(self.page, selector)
+
+    async def find_first_visible(self, selectors, timeout=None):
+        """Return the first visible element from a selector list."""
+        timeout = timeout or ConfigLoader.explicit_wait_timeout()
+        if isinstance(selectors, str):
+            selectors = [selectors]
+
+        last_error = None
+        for selector in selectors:
+            try:
+                element = await WaitUtilities.wait_for_visible(self.page, selector, timeout)
+                return selector, element
+            except Exception as exc:
+                last_error = exc
+                logger.debug(f"Selector not matched yet: {selector} ({exc})")
+
+        raise ElementNotFoundException(
+            f"None of the selectors became visible: {selectors}"
+        ) from last_error
     
     async def safe_click(self, selector: str):
         """
@@ -136,6 +122,18 @@ class BasePage(IBasePage):
             logger.error(f"Click failed: {selector} - {e}")
             await self.take_screenshot("click_failed")
             raise
+
+    async def safe_click_any(self, selectors, timeout=None):
+        """Click the first visible selector from a list."""
+        selector, element = await self.find_first_visible(selectors, timeout)
+        logger.info(f"Clicking first-matched selector: {selector}")
+        try:
+            await element.click(timeout=3000)
+        except Exception as first_error:
+            logger.warning(f"Standard click failed for {selector}: {first_error}")
+            await self.dismiss_common_popups()
+            await element.click(force=True, timeout=3000)
+        return selector
     
     async def safe_type(self, selector: str, text: str):
         """
@@ -157,6 +155,13 @@ class BasePage(IBasePage):
             logger.error(f"Type failed: {selector} - {e}")
             await self.take_screenshot("type_failed")
             raise
+
+    async def safe_type_any(self, selectors, text: str, timeout=None):
+        """Type into the first visible selector from a list."""
+        selector, element = await self.find_first_visible(selectors, timeout)
+        logger.info(f"Typing into first-matched selector: {selector}")
+        await element.fill(text)
+        return selector
     
     async def safe_get_text(self, selector: str) -> str:
         """
@@ -181,6 +186,13 @@ class BasePage(IBasePage):
         except Exception as e:
             logger.error(f"Get text failed: {selector} - {e}")
             raise
+
+    async def safe_get_text_any(self, selectors, timeout=None) -> str:
+        """Read text from the first visible selector from a list."""
+        selector, element = await self.find_first_visible(selectors, timeout)
+        text = await element.text_content()
+        logger.debug(f"Text read from selector: {selector}")
+        return text or ""
     
     async def scroll_to_element(self, selector: str):
         """
@@ -218,6 +230,123 @@ class BasePage(IBasePage):
         except Exception as e:
             logger.error(f"Screenshot failed: {e}")
             return None
+
+    async def dismiss_common_popups(self):
+        """Dismiss common overlays/popups if present.
+
+        Best-effort helper: intentionally ignores misses and continues.
+        """
+        # Neutralize known full-screen overlays that block pointer events.
+        try:
+            await self.page.evaluate(
+                """
+                () => {
+                  const selectors = [
+                    '#location-fullscreen-click-blocker',
+                    '#home-bargain-guide-portal-overlay',
+                    '#category-list-backdrop-overlay'
+                  ];
+                  for (const selector of selectors) {
+                    const el = document.querySelector(selector);
+                    if (el) {
+                      el.style.display = 'none';
+                      el.style.visibility = 'hidden';
+                      el.style.pointerEvents = 'none';
+                    }
+                  }
+                }
+                """
+            )
+        except Exception:
+            pass
+
+        popup_selectors = [
+            "button[aria-label='Close']",
+            "button:has-text('Close')",
+            "button:has-text('Not now')",
+            "button:has-text('Maybe later')",
+            "button:has-text('Skip')",
+            "button:has-text('No Thanks')",
+            "[role='dialog'] button:has-text('X')",
+            "[role='dialog'] button.close",
+            "div[role='dialog'] button svg",
+            "button:has-text('Got it')",
+        ]
+
+        # Special-case location gating modal observed on stg.gajab.com.
+        try:
+            location_modal = self.page.locator("section#location-desktop-dropdown").first
+            if await location_modal.is_visible(timeout=700):
+                pincode = os.getenv("TEST_PINCODE", "560037")
+
+                pincode_inputs = [
+                    "section#location-desktop-dropdown input[placeholder*='Pincode']",
+                    "section#location-desktop-dropdown input[placeholder*='City']",
+                    "section#location-desktop-dropdown input[type='text']",
+                ]
+                for selector in pincode_inputs:
+                    locator = self.page.locator(selector).first
+                    try:
+                        if await locator.is_visible(timeout=500):
+                            await locator.fill(pincode)
+                            break
+                    except Exception:
+                        pass
+
+                for selector in [
+                    "section#location-desktop-dropdown [role='option']:has-text('560037')",
+                    "section#location-desktop-dropdown li:has-text('560037')",
+                    "section#location-desktop-dropdown button:has-text('Continue')",
+                    "section#location-desktop-dropdown button:has-text('Confirm')",
+                    "section#location-desktop-dropdown button:has-text('Submit')",
+                    "section#location-desktop-dropdown button[aria-label='Close']",
+                ]:
+                    try:
+                        candidate = self.page.locator(selector).first
+                        if await candidate.is_visible(timeout=500):
+                            await candidate.click(timeout=1200)
+                    except Exception:
+                        pass
+
+                if await location_modal.is_visible(timeout=500):
+                    await self.page.evaluate(
+                        """
+                        () => {
+                          const el = document.querySelector('section#location-desktop-dropdown');
+                          if (el) {
+                            el.style.display = 'none';
+                            el.style.visibility = 'hidden';
+                            el.style.pointerEvents = 'none';
+                          }
+                        }
+                        """
+                    )
+
+                await self.page.evaluate(
+                    """
+                    () => {
+                      const blocker = document.querySelector('#location-fullscreen-click-blocker');
+                      if (blocker) {
+                        blocker.style.display = 'none';
+                        blocker.style.visibility = 'hidden';
+                        blocker.style.pointerEvents = 'none';
+                      }
+                    }
+                    """
+                )
+                logger.info("Processed location modal popup")
+        except Exception:
+            pass
+
+        for selector in popup_selectors:
+            try:
+                locator = self.page.locator(selector).first
+                if await locator.is_visible(timeout=700):
+                    await locator.click(timeout=1200)
+                    logger.info(f"Dismissed popup using selector: {selector}")
+            except Exception:
+                # Popups are optional; ignore and continue.
+                pass
     
     async def get_page_source(self) -> str:
         """

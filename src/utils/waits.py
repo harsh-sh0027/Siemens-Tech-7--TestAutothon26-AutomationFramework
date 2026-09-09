@@ -121,7 +121,7 @@ class WaitUtilities:
         try:
             # Playwright syntax (has .locator method)
             if hasattr(page, 'locator'):
-                element = page.locator(selector)
+                element = page.locator(selector).first
                 await element.wait_for(timeout=timeout * 1000, state='visible')
                 logger.debug(f"Element visible: {selector}")
                 return element
@@ -167,7 +167,7 @@ class WaitUtilities:
         try:
             if hasattr(page, 'locator'):
                 # Playwright: wait for enabled state
-                await page.locator(selector).wait_for(timeout=timeout * 1000, state='attached')
+                await page.locator(selector).first.wait_for(timeout=timeout * 1000, state='attached')
             elif hasattr(element, 'is_enabled'):
                 # Appium: check enabled
                 if not element.is_enabled():

@@ -14,10 +14,13 @@ Run Mobile:
 """
 
 import pytest
+from src.utils.challenge_data import ChallengeDataLoader, NegativeLoginData
 from src.utils.config import ConfigLoader
 from src.utils.logger import StructuredLogger
 
 logger = StructuredLogger.get_logger(__name__)
+
+NEGATIVE_LOGIN_CASES = ChallengeDataLoader.load_negative_login_cases()
 
 
 pytestmark = [
@@ -54,10 +57,11 @@ class TestLogin:
         """
         # Arrange
         logger.info("Arranging test data")
+        test_data = ChallengeDataLoader.load()
         login_page = page_factory.get_login_page()
-        mobile = ConfigLoader.test_mobile()
-        otp = ConfigLoader.test_otp()
-        pin = ConfigLoader.test_pin()
+        mobile = test_data.mobile_number
+        otp = test_data.otp
+        pin = test_data.pin
         
         logger.info(f"Test data: mobile=[REDACTED], otp=[REDACTED], pin=[REDACTED]")
         
@@ -86,7 +90,12 @@ class TestLogin:
         
         logger.info("Test PASSED: Login workflow completed successfully")
     
-    def test_login_invalid_otp(self, page_factory, driver, event_loop):
+    @pytest.mark.parametrize(
+        "negative_case",
+        NEGATIVE_LOGIN_CASES,
+        ids=[case.case_name for case in NEGATIVE_LOGIN_CASES],
+    )
+    def test_login_invalid_otp(self, page_factory, driver, event_loop, negative_case: NegativeLoginData):
         """
         Test login with invalid OTP (negative test).
         
@@ -100,8 +109,8 @@ class TestLogin:
         # Arrange
         logger.info("Testing invalid OTP flow")
         login_page = page_factory.get_login_page()
-        mobile = ConfigLoader.test_mobile()
-        invalid_otp = "000000"  # Obviously invalid OTP
+        mobile = negative_case.mobile_number or ConfigLoader.test_mobile()
+        invalid_otp = negative_case.otp or "000000"
         
         # Act
         event_loop.run_until_complete(login_page.navigate_to(ConfigLoader.base_url()))

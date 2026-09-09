@@ -59,6 +59,25 @@ pytest src/test/python/tests/ -v -n 4  # 4 workers
 pytest src/test/python/tests/test_login.py::TestLogin::test_login_valid_credentials -v
 ```
 
+#### Challenge 1 (22-step Workflow)
+```bash
+pytest src/test/python/tests/test_challenge1_workflow.py -k challenge1_web_e2e --browser chromium --headed -q
+```
+
+#### Language Coverage (English and Hinglish)
+```bash
+# English
+CHALLENGE_LANGUAGE=english pytest src/test/python/tests/test_challenge1_workflow.py -k challenge1_web_e2e -q
+
+# Hinglish
+CHALLENGE_LANGUAGE=hinglish pytest src/test/python/tests/test_challenge1_workflow.py -k challenge1_web_e2e -q
+```
+
+#### Non-Functional Checks
+```bash
+pytest src/test/python/tests/test_non_functional.py -m "web and nonfunctional" -q
+```
+
 #### Browser and Device-Size from CLI
 ```bash
 # Browser selection
@@ -136,6 +155,25 @@ Playwright built-in HTML investigation path:
 
 ```bash
 playwright show-trace reports/runs/<RUN_ID>/playwright-traces/<test-name>.zip
+```
+
+---
+
+## Data-Driven Inputs (Excel)
+
+Challenge workflow input data is sourced from:
+
+- `src/test/python/resources/challenge_data.xlsx`
+
+Workbook sheets:
+
+- `challenge1`: positive workflow data (mobile, otp, pin, language, category, brand, price range, product, payment, bank, email)
+- `negative_login`: negative login datasets (invalid OTP cases)
+
+To override workbook path:
+
+```bash
+CHALLENGE_DATA_PATH=/absolute/path/to/challenge_data.xlsx pytest ...
 ```
 
 ---
