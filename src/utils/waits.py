@@ -25,6 +25,34 @@ class WaitUtilities:
     """
     
     @staticmethod
+    def _resolve_appium_locator(selector: str):
+        """Translate a selector string into an Appium/Selenium locator tuple."""
+        from selenium.webdriver.common.by import By
+
+        try:
+            from appium.webdriver.common.appiumby import AppiumBy
+        except Exception:
+            AppiumBy = None
+
+        normalized = selector.strip()
+
+        if normalized.startswith('xpath='):
+            return By.XPATH, normalized[6:]
+        if normalized.startswith('//') or normalized.startswith('(//'):
+            return By.XPATH, normalized
+        if normalized.startswith('css='):
+            return By.CSS_SELECTOR, normalized[4:]
+        if normalized.startswith('id='):
+            return By.ID, normalized[3:]
+        if normalized.startswith('accessibility_id=') and AppiumBy is not None:
+            return AppiumBy.ACCESSIBILITY_ID, normalized[len('accessibility_id='):]
+        if ':id/' in normalized:
+            return By.ID, normalized
+        if any(token in normalized for token in ('[', '#', '.', '>', ' ', ',', ':')):
+            return By.CSS_SELECTOR, normalized
+        return By.ID, normalized
+
+    @staticmethod
     def wait_for_condition(
         condition: Callable[[], bool],
         timeout: Optional[int] = None,
@@ -102,10 +130,10 @@ class WaitUtilities:
             elif hasattr(page, 'find_element'):
                 from selenium.webdriver.support import expected_conditions as EC
                 from selenium.webdriver.support.ui import WebDriverWait
-                from selenium.webdriver.common.by import By
                 
                 wait = WebDriverWait(page, timeout)
-                element = wait.until(EC.visibility_of_element_located((By.XPATH, selector)))
+                locator = WaitUtilities._resolve_appium_locator(selector)
+                element = wait.until(EC.visibility_of_element_located(locator))
                 logger.debug(f"Element visible: {selector}")
                 return element
         except Exception as e:

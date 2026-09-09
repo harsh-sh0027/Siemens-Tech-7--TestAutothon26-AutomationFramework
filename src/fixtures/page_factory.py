@@ -42,6 +42,11 @@ class PageObjectFactory:
             ILoginPage: WebLoginPage (if Web) or MobileLoginScreen (if Mobile).
         """
         if self.is_mobile:
+            if getattr(self.driver, 'uses_browser', False):
+                logger.debug("Returning MobileWebLoginPage")
+                from src.pages.mobile.login_page_mobile_web import MobileWebLoginPage
+                return MobileWebLoginPage(self.driver.get_driver(), is_mobile=True)
+
             logger.debug("Returning MobileLoginScreen")
             from src.pages.mobile.login_page_mobile import MobileLoginScreen
             return MobileLoginScreen(self.driver.get_driver(), is_mobile=True)

@@ -125,6 +125,82 @@ class ConfigLoader:
             int: Appium port (default: 4723).
         """
         return int(os.getenv('APPIUM_PORT', '4723'))
+
+    @staticmethod
+    def mobile_target() -> str:
+        """
+        Mobile execution surface.
+
+        Returns:
+            str: Either native or web.
+        """
+        value = os.getenv('MOBILE_TARGET', 'native').strip().lower()
+        return value if value in {'native', 'web'} else 'native'
+
+    @staticmethod
+    def mobile_uses_browser() -> bool:
+        """
+        Returns whether Android execution should launch a browser.
+
+        Returns:
+            bool: True for Android Chrome/mobile website execution.
+        """
+        return ConfigLoader.mobile_target() == 'web'
+
+    @staticmethod
+    def android_platform_name() -> str:
+        """
+        Android platform name for Appium capabilities.
+
+        Returns:
+            str: Platform name.
+        """
+        return os.getenv('ANDROID_PLATFORM_NAME', 'Android').strip() or 'Android'
+
+    @staticmethod
+    def android_device_name() -> str:
+        """
+        Android device or emulator name.
+
+        Returns:
+            str: Device name.
+        """
+        return os.getenv('ANDROID_DEVICE_NAME', 'Android Emulator').strip() or 'Android Emulator'
+
+    @staticmethod
+    def android_platform_version() -> str | None:
+        """
+        Optional Android platform version.
+
+        Returns:
+            str | None: Platform version if configured.
+        """
+        value = os.getenv('ANDROID_PLATFORM_VERSION', '').strip()
+        return value or None
+
+    @staticmethod
+    def mobile_browser_name() -> str:
+        """
+        Mobile browser name for Android website sessions.
+
+        Returns:
+            str: Browser name.
+        """
+        return os.getenv('MOBILE_BROWSER_NAME', 'Chrome').strip() or 'Chrome'
+
+    @staticmethod
+    def app_path() -> str:
+        """
+        Path to the organizer-provided Android APK.
+
+        Returns:
+            str: Absolute path to the APK file.
+        """
+        configured = os.getenv('APP_PATH', '').strip()
+        if configured:
+            return configured
+        root_dir = Path(__file__).resolve().parents[2]
+        return str(root_dir / 'gajab-hackathon-sep4.apk')
     
     @staticmethod
     def app_package() -> str:
@@ -134,7 +210,7 @@ class ConfigLoader:
         Returns:
             str: Package name (e.g., com.example.gajab).
         """
-        return os.getenv('APP_PACKAGE', 'com.example.gajab')
+        return os.getenv('APP_PACKAGE', 'com.gajab.buyerstore')
     
     @staticmethod
     def app_activity() -> str:
@@ -144,7 +220,7 @@ class ConfigLoader:
         Returns:
             str: Activity name (e.g., .MainActivity).
         """
-        return os.getenv('APP_ACTIVITY', '.MainActivity')
+        return os.getenv('APP_ACTIVITY', 'com.gajab.buyerstore.MainActivity')
     
     # ===== TEST DATA =====
     @staticmethod

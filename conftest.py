@@ -205,6 +205,7 @@ def driver(is_mobile, event_loop, request):
     logger.info(f"Setting up driver for test: {test_name}")
     artifacts = getattr(request.config, "_run_artifacts", {})
     trace_path = None
+    driver_instance = None
     
     # Create driver based on is_mobile flag (synchronous)
     try:
@@ -223,6 +224,7 @@ def driver(is_mobile, event_loop, request):
             # Capture Playwright native trace for each web test.
             if hasattr(driver_instance, "start_trace"):
                 event_loop.run_until_complete(driver_instance.start_trace(trace_path))
+        driver_instance = event_loop.run_until_complete(DriverFactory.create_driver(is_mobile))
         
         logger.info("Driver fixture initialized successfully")
         yield driver_instance
@@ -241,8 +243,9 @@ def driver(is_mobile, event_loop, request):
             if is_mobile:
                 driver_instance.close()
             else:
+            if driver_instance is not None:
                 event_loop.run_until_complete(driver_instance.close())
-            logger.info("Driver closed successfully")
+                logger.info("Driver closed successfully")
         except Exception as e:
             logger.error(f"Error closing driver: {e}")
 
@@ -333,6 +336,10 @@ def pytest_runtest_makereport(item, call):
                         timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
                         screenshot_path = f"{screenshots_dir}/{item.name}-{timestamp}.png"
                         page.screenshot(path=screenshot_path)
+                        screenshot_path = f"reports/screenshots/{item.name}-{timestamp}.png"
+                        event_loop = item.funcargs.get('event_loop')
+                        if event_loop:
+                            event_loop.run_until_complete(page.screenshot(path=screenshot_path))
                         logger.error(f"Screenshot captured: {screenshot_path}")
                     elif hasattr(page, 'save_screenshot'):
                         # Appium

@@ -5,6 +5,7 @@ All tests and pages are platform-agnostic.
 """
 
 import asyncio
+from pathlib import Path
 from typing import Union, Optional
 from abc import ABC, abstractmethod
 
@@ -56,6 +57,7 @@ class PlaywrightDriver(IDriverProvider):
         self._trace_path = None
         self._trace_started = False
         self.is_mobile = False  # Web platform
+        self.uses_browser = True
         logger.info(f"PlaywrightDriver initialized (page: {page.url})")
 
     async def start_trace(self, trace_path: str):
@@ -96,16 +98,19 @@ class AppiumDriver(IDriverProvider):
     Wraps Appium client for Android automation via UiAutomator2.
     """
     
-    def __init__(self, driver):
+    def __init__(self, driver, uses_browser: bool):
         """
         Initialize Appium driver.
         
         Args:
             driver: Appium WebDriver instance.
+            uses_browser: Whether the Appium session targets Android browser.
         """
         self._driver = driver
         self.is_mobile = True  # Mobile platform
-        logger.info(f"AppiumDriver initialized (package: {ConfigLoader.app_package()})")
+        self.uses_browser = uses_browser
+        session_target = 'browser' if uses_browser else 'native-app'
+        logger.info(f"AppiumDriver initialized (target: {session_target})")
     
     def get_driver(self):
         """Return Appium driver."""
@@ -225,17 +230,39 @@ class DriverFactory:
         Raises:
             DriverInitException: If Appium connection fails.
         """
-        logger.info(f"Creating Appium driver (host: {ConfigLoader.appium_host()}:{ConfigLoader.appium_port()})")
+        logger.info(
+            f"Creating Appium driver (host: {ConfigLoader.appium_host()}:{ConfigLoader.appium_port()}, "
+            f"target: {ConfigLoader.mobile_target()})"
+        )
         
         try:
             from appium import webdriver as appium_webdriver
             from appium.options.android import UiAutomator2Options
             
             options = UiAutomator2Options()
-            options.app_package = ConfigLoader.app_package()
-            options.app_activity = ConfigLoader.app_activity()
+            options.platform_name = ConfigLoader.android_platform_name()
+            options.automation_name = 'UiAutomator2'
+            options.device_name = ConfigLoader.android_device_name()
+            platform_version = ConfigLoader.android_platform_version()
+            if platform_version:
+                options.platform_version = platform_version
             options.auto_grant_permissions = True
             options.new_command_timeout = ConfigLoader.page_load_timeout()
+
+            uses_browser = ConfigLoader.mobile_uses_browser()
+            if uses_browser:
+                options.browser_name = ConfigLoader.mobile_browser_name()
+                logger.info(f"Launching Android browser session: {ConfigLoader.mobile_browser_name()}")
+            else:
+                app_path = Path(ConfigLoader.app_path())
+                if app_path.exists():
+                    options.app = str(app_path)
+                    logger.info(f"Installing APK from: {app_path}")
+                else:
+                    logger.warning(f"Configured APK not found at {app_path}; falling back to installed app capabilities")
+
+                options.app_package = ConfigLoader.app_package()
+                options.app_activity = ConfigLoader.app_activity()
             
             # Connect to Appium server
             driver = appium_webdriver.Remote(
@@ -243,8 +270,8 @@ class DriverFactory:
                 options=options
             )
             
-            logger.info(f"Appium driver created successfully (package: {ConfigLoader.app_package()})")
-            return AppiumDriver(driver)
+            logger.info("Appium driver created successfully")
+            return AppiumDriver(driver, uses_browser=uses_browser)
         
         except Exception as e:
             logger.error(f"Failed to create Appium driver: {type(e).__name__}: {e}")
@@ -269,7 +296,7 @@ class DriverFactory:
         """
         if is_mobile:
             logger.info("=" * 60)
-            logger.info("MOBILE RUN (Appium/Android/UiAutomator2)")
+            logger.info(f"MOBILE RUN (Appium/Android/{ConfigLoader.mobile_target()})")
             logger.info("=" * 60)
             return DriverFactory.create_mobile_driver()
         else:

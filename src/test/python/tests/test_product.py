@@ -15,7 +15,7 @@ pytestmark = [
 
 class TestProduct:
     
-    def test_deal_of_day_capture(self, page_factory, driver, event_loop):
+    def test_deal_of_day_capture(self, page_factory, event_loop):
         """Test Deal of the Day product identification and capture."""
         logger.info("Starting Deal of Day test")
         
@@ -26,10 +26,7 @@ class TestProduct:
         pin = ConfigLoader.test_pin()
         
         # Act: Login first
-        if not driver.is_mobile:
-            event_loop.run_until_complete(login_page.navigate_to(ConfigLoader.base_url()))
-        else:
-            event_loop.run_until_complete(login_page.navigate_to())
+        event_loop.run_until_complete(login_page.navigate_to(ConfigLoader.base_url()))
         
         event_loop.run_until_complete(login_page.login_with_mobile(mobile))
         event_loop.run_until_complete(login_page.submit_otp(otp))

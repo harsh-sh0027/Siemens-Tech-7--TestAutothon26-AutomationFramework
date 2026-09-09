@@ -64,13 +64,8 @@ class TestLogin:
         # Act
         logger.info("Starting login test flow")
         
-        # Navigate (Web only; Mobile app already running via fixture)
-        if not driver.is_mobile:
-            logger.info(f"Web mode: navigating to {ConfigLoader.base_url()}")
-            event_loop.run_until_complete(login_page.navigate_to(ConfigLoader.base_url()))
-        else:
-            logger.info("Mobile mode: app already running via fixture")
-            event_loop.run_until_complete(login_page.navigate_to())
+        logger.info(f"Navigating via page contract to {ConfigLoader.base_url()}")
+        event_loop.run_until_complete(login_page.navigate_to(ConfigLoader.base_url()))
         
         # Step 1: Enter mobile and request OTP
         logger.info("Step 1: Entering mobile number and requesting OTP")
@@ -109,10 +104,7 @@ class TestLogin:
         invalid_otp = "000000"  # Obviously invalid OTP
         
         # Act
-        if not driver.is_mobile:
-            event_loop.run_until_complete(login_page.navigate_to(ConfigLoader.base_url()))
-        else:
-            event_loop.run_until_complete(login_page.navigate_to())
+        event_loop.run_until_complete(login_page.navigate_to(ConfigLoader.base_url()))
         
         event_loop.run_until_complete(login_page.login_with_mobile(mobile))
         

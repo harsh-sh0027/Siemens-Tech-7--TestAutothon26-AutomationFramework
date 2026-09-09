@@ -464,8 +464,14 @@ GAJAB_BASE_URL=https://stg.gajab.com
 # Appium settings
 APPIUM_HOST=127.0.0.1
 APPIUM_PORT=4723
-APP_PACKAGE=com.example.gajab
-APP_ACTIVITY=.MainActivity
+MOBILE_TARGET=native  # native for APK, web for Android Chrome
+ANDROID_PLATFORM_NAME=Android
+ANDROID_DEVICE_NAME=Android Emulator
+ANDROID_PLATFORM_VERSION=
+MOBILE_BROWSER_NAME=Chrome
+APP_PATH=./gajab-hackathon-sep4.apk
+APP_PACKAGE=com.gajab.buyerstore
+APP_ACTIVITY=com.gajab.buyerstore.MainActivity
 
 # Test data (synthetic values only)
 TEST_MOBILE=9999999999
@@ -490,7 +496,12 @@ SCREENSHOTS_DIR=./reports/screenshots
 export IS_MOBILE=false  # Web
 pytest src/test/python/tests/
 
-export IS_MOBILE=true  # Mobile
+export IS_MOBILE=true  # Mobile native APK
+export MOBILE_TARGET=native
+pytest src/test/python/tests/
+
+export IS_MOBILE=true  # Mobile website in Android Chrome
+export MOBILE_TARGET=web
 pytest src/test/python/tests/
 ```
 
@@ -503,6 +514,7 @@ pytest src/test/python/tests/              # Web (default)
 **Option 3: .env File**
 ```env
 IS_MOBILE=true
+MOBILE_TARGET=web
 ```
 
 ---
@@ -588,6 +600,8 @@ Both Web and Mobile runs execute in parallel with NO code changes.
 - Verify Appium server is running: `appium`
 - Check `APPIUM_HOST` and `APPIUM_PORT` in `.env`
 - Verify Android emulator/device is connected: `adb devices`
+- For native runs, verify `APP_PATH` points to `gajab-hackathon-sep4.apk`
+- For mobile website runs, verify Chrome is available in the emulator and `MOBILE_TARGET=web`
 
 ### Playwright Browser Issues
 - Re-install browsers: `python -m playwright install`
