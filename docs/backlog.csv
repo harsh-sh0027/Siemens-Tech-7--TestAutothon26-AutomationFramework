@@ -1,0 +1,29 @@
+Category,Priority,Size,Feature,Detail
+Gajab Workflow,P1,M,Sign up with mobile + OTP,Register with mobile number (9999999999) and verify OTP (organizer-provided test value)
+Gajab Workflow,P1,S,Email verification,Verify send email action works during signup
+Gajab Workflow,P1,S,Login with saved credentials,Authenticate with registered mobile number and password
+Gajab Workflow,P1,S,Browse app home page,Load home page and verify main UI elements render
+Gajab Workflow,P1,M,Search products by name,Query products and validate results display with name matching
+Gajab Workflow,P1,M,Filter by price range,Apply ₹427–₹727 price range filter and assert first visible product matches
+Gajab Workflow,P1,S,View product details,Navigate to product detail page and verify information loads
+Gajab Workflow,P1,S,Add product to cart,Click add-to-cart and verify cart count updates
+Gajab Workflow,P1,M,Checkout & place order,Complete checkout form with authorized test bank sandbox payment
+Gajab Workflow,P1,S,Verify order on success screen,Confirm order ID is visible and correct on success page
+Gajab Workflow,P2,M,Deal of the Day badge,Identify and validate Deal of the Day badge by UI appearance
+Gajab Workflow,P2,M,Trending products badge,Identify and validate Trending badge by UI appearance
+Gajab Workflow,P2,M,Savings in My Bargains,Navigate to My Bargains and assert savings amount/discount % displayed
+Gajab Workflow,P2,S,Screenshot capture at key steps,Capture and assert screenshots at signup/checkout/success screens
+Framework Infrastructure,P1,M,Web + Appium driver factory,Create reusable driver initialization for Web (Selenium) and Android (Appium) via isMobile flag
+Framework Infrastructure,P1,S,Config management,Centralize environment URLs; test data (mobile: 9999999999; bank sandbox credentials); API endpoints
+Framework Infrastructure,P1,M,Wait/action utility layer,Implement explicit wait helpers (no hardcoded sleeps); action chains for scroll/tap/swipe
+Framework Infrastructure,P1,M,Page Object Model base classes,Define base POM class with common methods; enforce consistent locator patterns (data-testid for Android; CSS/XPath for Web)
+Framework Infrastructure,P1,M,Logging & reporting,Set up structured logging (INFO/DEBUG/ERROR); generate HTML/JSON test reports with execution timestamps
+Framework Infrastructure,P1,M,Error handling & retry logic,Implement try-catch with meaningful error messages; retry flaky steps (max 2 attempts); capture error screenshots
+Framework Infrastructure,P1,M,CI/CD GitHub Actions workflow,Configure workflow to run tests in parallel on Web + Android; generate reports; post results to pull request
+Non-Functional,P1,S,No hardcoded waits,All waits must be explicit (WebDriverWait; FluentWait); no Thread.sleep() calls in test code
+Non-Functional,P1,S,SOLID + POM pattern,Single responsibility per POM class; Dependency Injection for driver; no test logic in POMs
+Non-Functional,P1,S,Cross-browser support,Tests must pass on Chrome; Firefox; Safari (Web); device/emulator (Android)
+Non-Functional,P1,S,Parallel execution,Test environments isolated; no shared state; safe to run Web + Android suites simultaneously
+Non-Functional,P1,S,Structured logging & naming,"Method names: test_<feature>_<scenario> (e.g. test_login_valid_credentials); Log all test steps; include User-Agent/device info"
+Non-Functional,P1,S,Screenshot assertions,"Capture at critical junctures (login success; order confirmation); assert element visibility; validate text/layout"
+Open Question,,,All setup answers confirmed,"OTP, email, credentials, badges, locators, parallel, screenshots, price range, order ID, savings, test data — ready to build"

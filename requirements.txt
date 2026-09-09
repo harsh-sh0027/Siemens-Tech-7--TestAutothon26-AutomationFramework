@@ -1,0 +1,9 @@
+playwright==1.62.0
+appium-python-client==6.0.3
+pytest==8.3.4
+pytest-xdist==3.8.0
+pytest-html==4.1.1
+allure-pytest==2.13.4
+python-dotenv
+pyotp
+openpyxl

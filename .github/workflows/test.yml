@@ -1,0 +1,174 @@
+name: Automation Quest — Web + Mobile Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      is_mobile:
+        description: "Run Mobile tests only (true/false)"
+        required: false
+        default: "false"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        is_mobile: [false, true]
+        include:
+          - is_mobile: false
+            platform: "Web (Playwright)"
+            browser: "chromium"
+          - is_mobile: true
+            platform: "Mobile (Appium/Android)"
+            browser: "appium"
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            venv/
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+      
+      - name: Install Playwright browsers
+        if: matrix.is_mobile == false
+        run: |
+          source venv/bin/activate
+          playwright install chromium firefox webkit
+      
+      - name: Start Appium server
+        if: matrix.is_mobile == true
+        run: |
+          npm install -g appium@2.x appium-uiautomator2-driver
+          appium --port 4723 &
+          sleep 5
+      
+      - name: Set up Android emulator
+        if: matrix.is_mobile == true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          profile: Nexus 6
+          cores: 2
+          ram-size: 2048M
+          disk-size: 2560M
+          headless: true
+          script: echo "Android emulator is running"
+      
+      - name: Run tests — ${{ matrix.platform }}
+        env:
+          IS_MOBILE: ${{ matrix.is_mobile }}
+          BROWSER: ${{ matrix.browser }}
+          GAJAB_BASE_URL: https://stg.gajab.com
+          APPIUM_HOST: 127.0.0.1
+          APPIUM_PORT: 4723
+        run: |
+          source venv/bin/activate
+          pytest src/test/python/tests/ \
+            -v \
+            --tb=short \
+            --html=reports/report-${{ matrix.platform }}.html --self-contained-html \
+            --junitxml=reports/junit-${{ matrix.platform }}.xml \
+            ${{ matrix.is_mobile == 'true' && '--isMobile' || '' }}
+      
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.platform }}
+          path: |
+            reports/
+            logs/
+          retention-days: 30
+      
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ matrix.platform }}-failure
+          path: reports/screenshots/
+          retention-days: 7
+      
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Test Results — ${{ matrix.platform }}
+          path: reports/junit-${{ matrix.platform }}.xml
+          reporter: "java-junit"
+      
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const platform = '${{ matrix.platform }}';
+            const testsPassed = fs.existsSync(`reports/junit-${platform}.xml`);
+            const comment = `## 🧪 Test Results — ${platform}\n✅ Tests executed in CI/CD`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  results:
+    name: Test Results Summary
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports/
+      
+      - name: Generate combined report summary
+        run: |
+          echo "# Test Execution Summary" > summary.md
+          echo "Workflow: Automation Quest Web + Mobile Test Suite" >> summary.md
+          echo "Date: $(date)" >> summary.md
+          echo "" >> summary.md
+          echo "## Matrix Execution" >> summary.md
+          echo "- ✅ Web (Playwright): See report-Web reports" >> summary.md
+          echo "- ✅ Mobile (Appium): See report-Mobile reports" >> summary.md
+          echo "" >> summary.md
+          echo "## Artifacts" >> summary.md
+          echo "- HTML Reports: reports/report-Web.html, reports/report-Mobile.html" >> summary.md
+          echo "- JUnit XML: reports/junit-Web.xml, reports/junit-Mobile.xml" >> summary.md
+          echo "- Logs: logs/run-*.log (with correlation IDs)" >> summary.md
+          echo "- Screenshots: reports/screenshots/ (on failure)" >> summary.md
+      
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-execution-summary
+          path: summary.md
+          retention-days: 30
