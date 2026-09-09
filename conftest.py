@@ -243,9 +243,9 @@ def driver(is_mobile, event_loop, request):
             if is_mobile:
                 driver_instance.close()
             else:
-            if driver_instance is not None:
-                event_loop.run_until_complete(driver_instance.close())
-                logger.info("Driver closed successfully")
+                if driver_instance is not None:
+                    event_loop.run_until_complete(driver_instance.close())
+                    logger.info("Driver closed successfully")
         except Exception as e:
             logger.error(f"Error closing driver: {e}")
 
