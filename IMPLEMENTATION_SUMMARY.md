@@ -13,9 +13,9 @@
 | File | Purpose | Status |
 |------|---------|--------|
 | `requirements.txt` | Locked dependency versions (Playwright 1.48.2, Appium 3.1.3, pytest 8.3.4, etc.) | ✅ Created |
-| `.env.template` | Environment variable template with defaults | ✅ Created |
+| `.env.example` | Environment variable template with defaults | ✅ Created |
 | `.gitignore` | Secure .env, logs/, reports/, __pycache__, *.pyc | ✅ Created |
-| `.env` | (Local, git-ignored) Actual configuration — copy from .env.template | ⚠️ Manual step |
+| `.env` | (Local, git-ignored) Actual configuration — copy from .env.example | ⚠️ Manual step |
 
 ### ✓ Framework Core (`src/utils/`)
 
@@ -338,7 +338,7 @@ $ pytest src/test/python/tests/test_login.py -v --isMobile
 
 **Configuration & Root**: 5
 - `requirements.txt`
-- `.env.template`
+- `.env.example`
 - `.gitignore`
 - `conftest.py`
 - `README.md`
@@ -387,7 +387,7 @@ $ pytest src/test/python/tests/test_login.py -v --isMobile
 
 ### 1. Copy `.env`
 ```bash
-cp .env.template .env
+cp .env.example .env
 ```
 
 ### 2. Install Dependencies

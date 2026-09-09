@@ -27,7 +27,7 @@ pip install -r requirements.txt
 python -m playwright install
 
 # 5. Copy .env template and configure
-cp .env.template .env
+cp .env.example .env
 # Edit .env to set IS_MOBILE, GAJAB_BASE_URL, Appium settings, etc.
 ```
 
@@ -80,28 +80,8 @@ pytest src/test/python/tests/ -v --headed
 pytest src/test/python/tests/ -v --headless
 ```
 
-#### Shortcut Script (npm-run style)
-Use one command wrapper file for common runs:
-
-```powershell
-# Web desktop on Firefox with custom viewport
-./run-tests.ps1 -Mode web -Browser firefox -TargetDevice desktop -Viewport 1600x900 -Headless
-
-# Web mobile emulation (Playwright built-in device)
-./run-tests.ps1 -Mode web -Browser chromium -TargetDevice iphone13 -Headless
-
-# Mobile Appium run
-./run-tests.ps1 -Mode mobile -TestPath src/test/python/tests/test_login.py -v
-```
-
-You can pass any extra pytest args at the end, for example:
-
-```powershell
-./run-tests.ps1 -Mode web -Browser chromium -TargetDevice desktop -Viewport 1366x768 -Headed -PytestArgs "-k","login","-n","2"
-```
-
 #### Keyword Runner (Very Short Commands)
-Use predefined keywords so you do not type long commands:
+Use one command wrapper file with predefined keywords so you do not type long commands:
 
 ```powershell
 # List available keywords
@@ -166,7 +146,7 @@ playwright show-trace reports/runs/<RUN_ID>/playwright-traces/<test-name>.zip
 .
 ├── README.md                          # This file
 ├── requirements.txt                   # Locked dependency versions
-├── .env.template                      # Environment config template
+├── .env.example                       # Environment config template
 ├── .env                               # (git-ignored) Actual config
 ├── .gitignore                         # Secure files/dirs
 ├── conftest.py                        # pytest fixtures & hooks

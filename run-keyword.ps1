@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
 
-$profiles = @{
+$keywordProfiles = @{
     chrome = @{
         Description = "Web Chrome desktop 1366x768 headed"
         Mode = "web"
@@ -82,13 +82,13 @@ $profiles = @{
 
 if ($List) {
     Write-Host "Available keywords:" -ForegroundColor Cyan
-    foreach ($name in ($profiles.Keys | Sort-Object)) {
-        Write-Host ("  {0}  -  {1}" -f $name, $profiles[$name].Description)
+    foreach ($name in ($keywordProfiles.Keys | Sort-Object)) {
+        Write-Host ("  {0}  -  {1}" -f $name, $keywordProfiles[$name].Description)
     }
     exit 0
 }
 
-if (-not $profiles.ContainsKey($Key)) {
+if (-not $keywordProfiles.ContainsKey($Key)) {
     Write-Host "Unknown key: $Key" -ForegroundColor Red
     Write-Host "Run: ./run-keyword.ps1 -List" -ForegroundColor Yellow
     exit 1
@@ -99,50 +99,101 @@ if ($Headless -and $Headed) {
     exit 1
 }
 
-$selectedRun = $profiles[$Key]
+$selectedRun = $keywordProfiles[$Key]
 
-$scriptParams = @{
-    Mode = $selectedRun.Mode
+$pythonExe = Join-Path $root '.venv/Scripts/python.exe'
+if (-not (Test-Path $pythonExe)) {
+    throw "Python venv executable not found at $pythonExe"
 }
 
-if ($selectedRun.ContainsKey("Browser")) {
-    $scriptParams.Browser = $selectedRun.Browser
-}
-if ($selectedRun.ContainsKey("TargetDevice")) {
-    $scriptParams.TargetDevice = $selectedRun.TargetDevice
-}
-if ($selectedRun.ContainsKey("Viewport")) {
-    $scriptParams.Viewport = $selectedRun.Viewport
-}
+$mode = $selectedRun.Mode
+$browser = if ($selectedRun.ContainsKey("Browser")) { $selectedRun.Browser } else { "chromium" }
+$targetDevice = if ($selectedRun.ContainsKey("TargetDevice")) { $selectedRun.TargetDevice } else { "desktop" }
+$viewport = if ($selectedRun.ContainsKey("Viewport")) { $selectedRun.Viewport } else { "1366x768" }
+$effectiveTestPath = if ([string]::IsNullOrWhiteSpace($TestPath)) { "src/test/python/tests" } else { $TestPath }
+
+# Decide final headless mode from profile defaults, then apply explicit user override.
+$effectiveHeadless = $null
 if ($selectedRun.ContainsKey("Headless")) {
-    if ($selectedRun.Headless) {
-        $scriptParams.Headless = $true
-    } else {
-        $scriptParams.Headed = $true
-    }
+    $effectiveHeadless = [bool]$selectedRun.Headless
 }
-if (-not [string]::IsNullOrWhiteSpace($TestPath)) {
-    $scriptParams.TestPath = $TestPath
-}
-
-# User preference overrides profile default headed/headless behavior.
 if ($Headless) {
-    $scriptParams.Remove("Headed") | Out-Null
-    $scriptParams.Headless = $true
+    $effectiveHeadless = $true
 }
 if ($Headed) {
-    $scriptParams.Remove("Headless") | Out-Null
-    $scriptParams.Headed = $true
+    $effectiveHeadless = $false
 }
 
-$effectivePytestArgs = @("-v")
-if ($PytestArgs) {
-    $effectivePytestArgs += $PytestArgs
+# Platform mode
+if ($mode -eq 'mobile') {
+    $env:IS_MOBILE = 'true'
+} else {
+    $env:IS_MOBILE = 'false'
 }
-$scriptParams.PytestArgs = $effectivePytestArgs
+
+# Browser mode (used in web mode)
+$env:BROWSER = $browser
+if ($browser -eq 'chrome') {
+    $env:BROWSER_CHANNEL = 'chrome'
+} elseif ($browser -eq 'edge') {
+    $env:BROWSER_CHANNEL = 'msedge'
+} else {
+    Remove-Item Env:BROWSER_CHANNEL -ErrorAction SilentlyContinue
+}
+
+# Headless override
+if ($null -ne $effectiveHeadless) {
+    if ($effectiveHeadless) {
+        $env:HEADLESS = 'true'
+    } else {
+        $env:HEADLESS = 'false'
+    }
+}
+
+# Device / viewport profile (web only)
+Remove-Item Env:PLAYWRIGHT_DEVICE -ErrorAction SilentlyContinue
+switch ($targetDevice) {
+    'desktop' {
+        $normalized = $viewport.ToLower().Replace(' ', '')
+        if ($normalized -notmatch '^[0-9]+x[0-9]+$') {
+            throw "Invalid viewport value '$viewport'. Use WIDTHxHEIGHT like 1920x1080"
+        }
+        $parts = $normalized.Split('x')
+        $env:VIEWPORT_WIDTH = $parts[0]
+        $env:VIEWPORT_HEIGHT = $parts[1]
+    }
+    'iphone13' {
+        $env:PLAYWRIGHT_DEVICE = 'iPhone 13'
+    }
+    'pixel5' {
+        $env:PLAYWRIGHT_DEVICE = 'Pixel 5'
+    }
+    'ipadMini' {
+        $env:PLAYWRIGHT_DEVICE = 'iPad Mini'
+    }
+}
+
+$effectivePytestArgs = @('-v')
+if ($PytestArgs) {
+    $effectivePytestArgs += ($PytestArgs | Where-Object { $_ -ne '--' })
+}
+
+$cmd = @('-m', 'pytest', $effectiveTestPath)
+if ($mode -eq 'mobile') {
+    $cmd += '--isMobile'
+}
+if ($effectivePytestArgs) {
+    $cmd += $effectivePytestArgs
+}
 
 Write-Host ("Using key: {0}" -f $Key) -ForegroundColor Green
 Write-Host ("Profile: {0}" -f $selectedRun.Description) -ForegroundColor Green
+Write-Host "Running tests with Mode=$mode Browser=$browser TargetDevice=$targetDevice" -ForegroundColor Cyan
+if ($env:PLAYWRIGHT_DEVICE) {
+    Write-Host "Using Playwright device profile: $($env:PLAYWRIGHT_DEVICE)" -ForegroundColor Cyan
+} else {
+    Write-Host "Using viewport: $($env:VIEWPORT_WIDTH)x$($env:VIEWPORT_HEIGHT)" -ForegroundColor Cyan
+}
 
-& "$root/run-tests.ps1" @scriptParams
+& $pythonExe @cmd
 exit $LASTEXITCODE
