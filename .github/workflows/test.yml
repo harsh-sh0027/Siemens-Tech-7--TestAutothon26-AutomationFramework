@@ -30,6 +30,11 @@ on:
         required: false
         default: false
         type: boolean
+      include_live:
+        description: "Include live locator dependent tests"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   web-tests:
@@ -71,6 +76,15 @@ jobs:
             marker="web"
           else
             marker="web and $suite"
+          fi
+
+          include_live=false
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.include_live }}" == "true" ]]; then
+            include_live=true
+          fi
+
+          if [[ "$include_live" != "true" ]]; then
+            marker="$marker and not live"
           fi
 
           echo "suite=$suite" >> "$GITHUB_OUTPUT"
@@ -159,7 +173,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            pytest src/test/python/tests -m "mobile and smoke" --isMobile
+            pytest src/test/python/tests -m "mobile and smoke and not live" --isMobile
 
       - name: Upload mobile artifacts
         if: always()

@@ -15,7 +15,7 @@ pytestmark = [
 
 class TestProduct:
     
-    def test_deal_of_day_capture(self, page_factory, driver):
+    def test_deal_of_day_capture(self, page_factory, driver, event_loop):
         """Test Deal of the Day product identification and capture."""
         logger.info("Starting Deal of Day test")
         
@@ -27,14 +27,14 @@ class TestProduct:
         
         # Act: Login first
         if not driver.is_mobile:
-            login_page.navigate_to(ConfigLoader.base_url())
+            event_loop.run_until_complete(login_page.navigate_to(ConfigLoader.base_url()))
         else:
-            login_page.navigate_to()
+            event_loop.run_until_complete(login_page.navigate_to())
         
-        login_page.login_with_mobile(mobile)
-        login_page.submit_otp(otp)
-        login_page.submit_pin(pin)
-        assert login_page.verify_login_success(), "Login failed"
+        event_loop.run_until_complete(login_page.login_with_mobile(mobile))
+        event_loop.run_until_complete(login_page.submit_otp(otp))
+        event_loop.run_until_complete(login_page.submit_pin(pin))
+        assert event_loop.run_until_complete(login_page.verify_login_success()), "Login failed"
         
         # TODO: Navigate to Deal of Day section
         # TODO: Extract product name, asking price, image

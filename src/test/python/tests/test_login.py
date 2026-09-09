@@ -23,6 +23,7 @@ logger = StructuredLogger.get_logger(__name__)
 pytestmark = [
     pytest.mark.regression,
     pytest.mark.integration,
+    pytest.mark.live,
     pytest.mark.web,
     pytest.mark.mobile,
 ]

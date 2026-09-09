@@ -15,6 +15,7 @@ pytestmark = [
 
 class TestBargaining:
     
+    @pytest.mark.smoke
     def test_bargaining_three_attempts(self, page_factory, driver):
         """Test bargaining flow with max 3 offers, then accept."""
         logger.info("Starting Bargaining test (3 attempts)")
