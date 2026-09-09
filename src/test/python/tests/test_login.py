@@ -20,9 +20,18 @@ from src.utils.logger import StructuredLogger
 logger = StructuredLogger.get_logger(__name__)
 
 
+pytestmark = [
+    pytest.mark.regression,
+    pytest.mark.integration,
+    pytest.mark.web,
+    pytest.mark.mobile,
+]
+
+
 class TestLogin:
     """Login workflow tests."""
     
+    @pytest.mark.smoke
     def test_login_valid_credentials(self, page_factory, driver, event_loop):
         """
         Test login with valid test credentials.

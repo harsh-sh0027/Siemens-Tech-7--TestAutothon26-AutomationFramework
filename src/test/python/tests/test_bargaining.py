@@ -7,6 +7,12 @@ from src.utils.logger import StructuredLogger
 logger = StructuredLogger.get_logger(__name__)
 
 
+pytestmark = [
+    pytest.mark.regression,
+    pytest.mark.web,
+]
+
+
 class TestBargaining:
     
     def test_bargaining_three_attempts(self, page_factory, driver):

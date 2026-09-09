@@ -7,6 +7,12 @@ from src.utils.logger import StructuredLogger
 logger = StructuredLogger.get_logger(__name__)
 
 
+pytestmark = [
+    pytest.mark.regression,
+    pytest.mark.web,
+]
+
+
 class TestMyBargains:
     
     def test_my_bargains_savings_verification(self, page_factory, driver):
